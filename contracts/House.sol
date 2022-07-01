@@ -11,7 +11,6 @@ contract House is Context{
 
     struct HouseDetails {
         uint256 buyPrice;
-        uint256 rentPrice;
         uint64 squareFootLand;
         uint8 numOfBedrooms;
         uint8 numOfBathrooms;
@@ -24,21 +23,38 @@ contract House is Context{
 
     struct RenterDetails {
         uint256 amountPaidTotal;
+        uint256 rentPrice;
         uint64 timeRentDue;
         uint64 timeRentedSince;
         uint64 timeRentedUntil;
+        PayPeriod payPeriod;
         address renter;
+        bool renting;
+        bool hasPermission;
     }
 
     mapping(uint256 => RenterDetails) private renters;
 
+    address private allowedRenter;
+
     uint256 private renterId;
+
 
     bool private currentlyInDeal;
 
-    address private allowedRenter;
+    struct DealDetails {
+        uint256 amountDueTtotal;
+        uint256 amountPaidTotal;
+        uint64 timeRentDue;
+        uint64 timeRentedSince;
+        uint64 timeRentedUntil;
+        PayPeriod payPeriod;
+        address renter;
+    }
 
-    enum payPeriod {
+    DealDetails private currentDeal;
+
+    enum PayPeriod {
         week,
         twoWeeks,
         month,
@@ -66,11 +82,12 @@ contract House is Context{
             squareFootLand = _squareFootLand;
             city = _city;
             buyPrice = _buyPrice;
-            rentPrice = _rentPrice;
             forSale = _forSale;
         })
         deployer = _msgSender();
     
+        renters[1].rentPrice = _rentPrice;
+
         ownerOfProperty = _owner;
     }
 
@@ -86,6 +103,11 @@ contract House is Context{
 
     modifier onlyApproved {
         require(_msgSender() == deployer || _msgSender == ownerOfProperty, "ERR:ND");//ND => No0t Deployer
+        _;
+    }
+
+    modifier onlyRenter{
+        require(_msgSender() == renters[renterId].renter, "ERR:NA");//NA => Not Approved
         _;
     }
 
@@ -110,12 +132,12 @@ contract House is Context{
     }
 
 
-    function setPayPeriod(uint64 _new) external onlyOwner{
+    function setPayPeriod(uint8 _new) external onlyOwner{
         require(_new > uint64(7 days)-1, "ERR:ST");//ST => Small Time
 
         require(renters[renterId].timeRentedUntil != 0, "ERR:CR");//CR => Currently Rented
 
-        house.payPeriod = _new;
+        renters[renterId].payPeriod = PayPeriod(_new);
 
         //emit event
     }
@@ -128,19 +150,31 @@ contract House is Context{
         //emit event
     }
 
-    function setDetails(uint256 _bPrice, uint256 _rPrice, uint64 _period, bool _state) external onlyOwner {
+    function setHouseDetails(uint256 _bPrice, bool _state) external onlyOwner {
         require(!currentlyInDeal, "ERR:ID");//ID => In Deal
-        require(renters[renterId].timeRentedUntil != 0, "ERR:CR");//CR => Currently Rented
-        require(_period > uint64(7 days)-1, "ERR:ST");//ST => Small Time
         require(_bPrice != 0, "ERR:ZP");//ZR => Zero Price
+
+        HouseDetails storage hDetails = house;
+
+        hDetails.buyPrice = _bPrice;
+        hDetails.forSale = _state;
+        
+        
+        
+
+        //emit event
+    }
+
+    function setRentDetail(uint256 _rPrice, uint8 _period) external onlyOwner {
+        require(_period <= type(PayPeriod).max, "ERR:ST");//ST => Small Time
+        require(renters[renterId].timeRentedUntil != 0, "ERR:CR");//CR => Currently Rented
         require(_rPrice != 0, "ERR:ZR");//ZR => Zero Rent
 
-        HouseDetails storage _house;
+        RenterDetails storage rDetails = renters[renterId +1];
 
-        _house.buyPrice = _bPrice;
-        _house.rentPrice = _rPrice;
-        _house.payPeriod = _period;
-        _house.forSale = _state;
+        rDetails.payPeriod = PayPeriod(_period);
+        rDetails.rentPrice = _rPrice;
+
 
         //emit event
     }
@@ -180,30 +214,74 @@ contract House is Context{
         }
     }
 
-    function startNewRent() external payable {
-        require(_msgSender() == allowedRenter, "ERR:NA");//NA => Not Allowed
+    // Functionality for Renter 
+    function startNewRent() external payable onlyRenter {
+        
 
         require(allowedRenter != address(0), "ERR:ZA");//ZA => Zero Address
 
-
-        if(renterId != 0){
-            require(renters[renterId].timeRentedUntil != 0, "ERR:CR");//CR => Currently Rented
-        }
-
-        uint256 id = renterId+1;
-
+        uint256 id = renterId;    
+        
         RenterDetails storage details = renters[id];
 
+        require(details.rentPrice ! = 0, "ERR:NS");//NS => Not Set
+
+        uint256 valueSent = msg.value;
+
+        require(valueSent == details.rentPrice,"ERR:WV");//WV => Wrong Value
+
+        if(id != 0){
+            require(details.timeRentedUntil != 0, "ERR:CR");//CR => Currently Rented
+        }
+
+        
+        details.amountPaidTotal += valueSent;
         details.timeRentedSince = uint64(block.timestamp);
-        details.timeRentDue = uint64(block.timestamp + house.payPeriod);
+        details.timeRentDue = uint64(block.timestamp) + getSeconds(uint8(details.payPeriod));
         details.renter = allowedRenter;
+        details.renting = true;
 
         delete allowedRenter;
     
-    
+
     }
 
+    // Functionality for renter to leave after 1 set payperiod 
+    function leaveProperty() external payable onlyRenter{
+        RenterDetails storage details = renters[id];
+        
+        uint256 value = msg.value;
+        require(value == details.rentPrice, 'ERR:WV'); //WV => Wrong Value 
 
+        (bool success, ) = ownerOfProperty.call{value: value}("");
+
+        require(success,"ERR:OT");//OT => On Trnasfer
+
+
+        details.timeRentedUntil = uint64(block.timestamp) + getSeconds(uint8(details.payPeriod));
+
+        delete details.renting;
+    }
+
+    // Functionality for renter to leave immdetialtely after having the permission from the owner or government
+    function leavePropertyImmediately () external onlyRenter {
+        RenterDetails storage details = renters[id];
+        require(details.hasPermission,'ERR:NP'); //NP => No Permission
+
+        details.timeRentUntil = uint64(block.timestamp);
+
+        delete details.renting;
+    }
+
+    function givePermissionFromGov() external onlyDeployer {
+        RenterDetails storage details = renters[id];
+        details.hasPermission = true;
+    }
+
+    function givePermissionFromOwner() external onlyOwner {
+        RenterDetails storage details = renters[id];
+        details.hasPermission = true;
+    }
     
     function buyProperty() external payable{
 
@@ -212,10 +290,13 @@ contract House is Context{
 
 
 
-    // struct RenterDetails {
-    //     uint256 amountPaidTotal;
-    //     uint64 timeRentDue;
-    //     uint64 timeRentedSince;
-    //     uint64 timeRentedUntil;
-    //     address renter;
-    // }
+//    struct RenterDetails {
+//         uint256 amountPaidTotal;
+//         uint256 rentPrice;
+//         uint64 timeRentDue;
+//         uint64 timeRentedSince;
+//         uint64 timeRentedUntil;
+//         uint32 payPeriod;
+//         address renter;
+//         bool renting;
+//     }

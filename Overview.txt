@@ -1,0 +1,33 @@
+Buy & sell properties with permission from government
+Rent properties
+Pay over time
+
+small governments
+each countries real estate market would be on it's own supernet
+
+a buyer can purchase a property contract aslong as they have viewed the property & went through proper KYC channels to 
+verify that the purchase is authentic & allowed by government
+
+Each contract has a link to IPNS containing metadata about the property 
+
+Property addresses kept off chain
+
+Taxes taken potentially on chain, country specific
+
+House 
+-num of bedrooms
+-num of bathrooms
+-sqrfoot land
+-city
+-min buy price
+-monthly rent price
+-Whether it's up for sale or not
+-num of floors
+-owner
+
+-owner gets to set a deal on the contract for a user to buy the property over time
+-seller will not have the right to sell the property while locked in a buy over time deal unless the 
+buyer breaks terms of the buy over time agreement
+
+
+
