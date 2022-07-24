@@ -2,12 +2,14 @@
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract House is Context {
+contract House is Context, ReentrancyGuard {
     address private ownerOfProperty;
 
-    address private deployer;
+    address private deployer; // * Government
 
+    // * Details of the House
     struct HouseDetails {
         uint256 buyPrice;
         uint64 squareFootLand;
@@ -20,6 +22,7 @@ contract House is Context {
 
     HouseDetails private house;
 
+    // * Renting Details
     struct RenterDetails {
         uint256 amountPaidTotal;
         uint256 rentPrice;
@@ -32,23 +35,28 @@ contract House is Context {
         bool hasPermission;
     }
 
-    mapping(uint256 => RenterDetails) private renters;
-
     address private allowedRenter;
 
     uint256 private renterId;
 
+    mapping(uint256 => RenterDetails) private renters;
+
     bool private currentlyInDeal;
 
+    address private allowedPurchaser;
+
+    // * Buying Deal Details
     struct DealDetails {
         uint256 amountPaidTotal;
         uint256 instalmentAmount;
         uint64 timeInstalmentDue;
         uint64 timeInstalmentSince;
         uint16 noOfInstalments;
+        uint16 penaltyPercentForOwner;
         PayPeriod payPeriod;
         address buyer;
         bool termsAcceptedByOwner;
+        bool cancellingPermission;
     }
 
     DealDetails private currentDeal;
@@ -110,13 +118,21 @@ contract House is Context {
 
     modifier onlyApproved() {
         address caller = _msgSender();
-        require(caller == deployer || caller == ownerOfProperty, "ERR:ND"); //ND => No0t Deployer
+        require(caller == deployer || caller == ownerOfProperty, "ERR:ND"); //ND => Not Deployer
         _;
     }
 
     modifier onlyRenter() {
         require(_msgSender() == renters[renterId].renter, "ERR:NA"); //NA => Not Approved
         _;
+    }
+
+    //* FUNCTION: To check whether the rent is due
+    function isRentDue(uint256 _renterId) external view returns (bool) {
+        return
+            renters[_renterId].timeRentDue < uint64(block.timestamp)
+                ? true
+                : false;
     }
 
     function setBuyPrice(uint256 _new) external onlyOwner {
@@ -183,18 +199,24 @@ contract House is Context {
         //emit event
     }
 
-    function changeOwnership(address _new) external onlyApproved {
+    function changeOwnership(address _new) external onlyDeployer {
         require(_new != address(0), "ERR:ZA"); //ZA => Zero Address
 
         ownerOfProperty = _new;
     }
 
-    function kickOutRenter() external onlyOwner {
-        renters[renterId].timeRentedUntil = uint64(block.timestamp + 7 days);
+    function kickOutRenter(uint64 _gracePeriod) external onlyOwner {
+        renters[renterId].timeRentedUntil =
+            uint64(block.timestamp) +
+            _gracePeriod;
+
+        // Emit Event
     }
 
     function emergencyKick() external onlyOwner {
         renters[renterId].timeRentedUntil = uint64(block.timestamp);
+
+        // Emit Event
     }
 
     function allowRenter(address _renter) external onlyDeployer {
@@ -218,9 +240,12 @@ contract House is Context {
         }
     }
 
-    // Functionality for Renter
-    function startNewRent() external payable onlyRenter {
-        require(allowedRenter != address(0), "ERR:ZA"); //ZA => Zero Address
+    // *  Functionality for Renter
+    function startNewRent() external payable {
+        address allowedRenterInstance = allowedRenter;
+
+        require(allowedRenterInstance != address(0), "ERR:ZA"); //ZA => Zero Address
+        require(allowedRenterInstance == _msgSender(), "ERR:NR"); //NR => N
 
         uint256 id = renterId;
 
@@ -241,7 +266,7 @@ contract House is Context {
         details.timeRentDue =
             uint64(block.timestamp) +
             getSeconds(uint8(details.payPeriod));
-        details.renter = allowedRenter;
+        details.renter = allowedRenterInstance;
         details.renting = true;
 
         delete allowedRenter;
@@ -265,18 +290,6 @@ contract House is Context {
         delete details.renting;
     }
 
-    // Functionality for renter to leave immdetialtely after having the permission from the owner or government
-    function leavePropertyImmediately() external onlyRenter {
-        uint256 id = renterId;
-
-        RenterDetails storage details = renters[id];
-        require(details.hasPermission, "ERR:NP"); //NP => No Permission
-
-        details.timeRentedUntil = uint64(block.timestamp);
-
-        delete details.renting;
-    }
-
     function givePermissionFromGov() external onlyDeployer {
         uint256 id = renterId;
 
@@ -289,6 +302,18 @@ contract House is Context {
 
         RenterDetails storage details = renters[id];
         details.hasPermission = true;
+    }
+
+    //* Function: for renter to leave immdetialtely after having the permission from the owner or government
+    function leavePropertyImmediately() external onlyRenter {
+        uint256 id = renterId;
+
+        RenterDetails storage details = renters[id];
+        require(details.hasPermission, "ERR:NP"); //NP => No Permission
+
+        details.timeRentedUntil = uint64(block.timestamp);
+
+        delete details.renting;
     }
 
     function buyProperty() external payable {}
@@ -309,9 +334,11 @@ contract House is Context {
         renter.amountPaidTotal += value;
     }
 
+    //* FUNCTION: For buying the house
     function setDeal(
         uint256 _instalmentAmount,
         uint16 _noOfInstalments,
+        uint16 _penaltyPercentageForOwner,
         PayPeriod _payPeriod,
         address _buyer
     ) external onlyDeployer {
@@ -321,6 +348,7 @@ contract House is Context {
 
         deal.instalmentAmount = _instalmentAmount;
         deal.buyer = _buyer;
+        deal.penaltyPercentForOwner = _penaltyPercentageForOwner;
         deal.noOfInstalments = _noOfInstalments;
         deal.payPeriod = _payPeriod;
     }
@@ -339,6 +367,7 @@ contract House is Context {
         require(!currentlyInDeal, "ERR:ID"); // ID => In Deal
 
         DealDetails storage deal = currentDeal;
+        require(deal.termsAcceptedByOwner, "ERR:NA"); // NA => Not Accepted
 
         uint256 value = msg.value;
         require(value == deal.instalmentAmount, "ERR:WV"); // WV => Wrong Value
@@ -355,7 +384,7 @@ contract House is Context {
         currentlyInDeal = true;
     }
 
-    //! TODO: Make seperate functions for owner to decline the deal after the approval of the deployer
+    // * FUNCTION: Cancel the buying deal before in the the deal
     function cancelDeal() external {
         address caller = _msgSender();
 
@@ -371,16 +400,50 @@ contract House is Context {
         if (caller != deal.buyer) {
             require(!currentlyInDeal, "ERR:ID");
         }
-        delete deal.amountPaidTotal;
-        delete deal.instalmentAmount;
-        delete deal.timeInstalmentDue;
-        delete deal.timeInstalmentSince;
-        delete deal.noOfInstalments;
-        delete deal.payPeriod;
-        delete deal.buyer;
+        resetDetails(deal);
     }
 
-    function payInstalments() external payable onlyBuyer {
+    // * FUNCTION: Request to raise permission for canceling the active buying deal by the owner.
+    function cancelActiveDealByOwner() external payable onlyOwner {
+        DealDetails storage deal = currentDeal;
+
+        if (deal.cancellingPermission) {
+            resetDetails(deal);
+        } else {
+            uint256 value = msg.value;
+            uint256 penaltyAmount = (deal.amountPaidTotal *
+                deal.penaltyPercentForOwner) / 100;
+            require(value == penaltyAmount, "ERR:WV"); // WV=> Wrong Value
+
+            (bool success, ) = deal.buyer.call{value: value}("");
+            require(success);
+
+            resetDetails(deal);
+        }
+
+        // Emit Event
+    }
+
+    function givePermissionToCancelActiveDeal() external onlyDeployer {
+        DealDetails storage deal = currentDeal;
+        require(currentlyInDeal, "ERR:ND"); // ND=> No Deal
+        deal.cancellingPermission = true;
+    }
+
+    //* FUNCTION: To reset the deal Details
+    function resetDetails(DealDetails storage _deal) internal {
+        delete _deal.amountPaidTotal;
+        delete _deal.instalmentAmount;
+        delete _deal.timeInstalmentDue;
+        delete _deal.timeInstalmentSince;
+        delete _deal.noOfInstalments;
+        delete _deal.payPeriod;
+        delete _deal.buyer;
+        delete _deal.penaltyPercentForOwner;
+    }
+
+    // * FUNCTION: Paying the instalments of the house after buying.
+    function payInstalments() external payable onlyBuyer nonReentrant {
         require(currentlyInDeal, "ERR:ND"); // ND => No Deal
 
         DealDetails storage deal = currentDeal;
@@ -392,26 +455,43 @@ contract House is Context {
 
         (bool success, ) = ownerOfProperty.call{value: value}("");
 
-        require(success, "ERR:OT");
+        require(success, "ERR:OT"); // OT => ON Transfer
 
         if (--deal.noOfInstalments == 0) {
             ownerOfProperty = deal.buyer;
 
             delete currentlyInDeal;
 
-            //emit event
+            resetDetails(deal);
 
-            delete deal.amountPaidTotal;
-            delete deal.instalmentAmount;
-            delete deal.timeInstalmentDue;
-            delete deal.timeInstalmentSince;
-            delete deal.noOfInstalments;
-            delete deal.payPeriod;
-            delete deal.buyer;
+            //emit event
         } else {
             deal.amountPaidTotal += value;
 
             deal.timeInstalmentDue += getSeconds(uint8(deal.payPeriod));
         }
+    }
+
+    // * FUNCTION: Giving permission to the address to buy the property at Once
+    function givePermissionToBuyOutRight(address _approvedBuyer)
+        external
+        onlyDeployer
+    {
+        allowedPurchaser = _approvedBuyer;
+    }
+
+    // * FUNCTION: Buy Out the property right away with permission from deployer.
+    function buyOutRight() external payable {
+        address caller = _msgSender();
+
+        require(caller == allowedPurchaser, "ERR:NA"); // NA=> Not Allowed
+
+        uint256 value = msg.value;
+        require(value == house.buyPrice, "ERR:WV"); // WV => Wrong Value
+
+        (bool success, ) = ownerOfProperty.call{value: value}("");
+        require(success, "ERR:OT"); // OT => On transfer
+
+        ownerOfProperty = caller;
     }
 }
