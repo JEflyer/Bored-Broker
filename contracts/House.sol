@@ -24,16 +24,23 @@ contract House is Context, ReentrancyGuard {
 
     // * Renting Details
     struct RenterDetails {
-        uint256 amountPaidTotal;
-        uint256 rentPrice;
-        uint64 timeRentDue;
-        uint64 timeRentedSince;
-        uint64 timeRentedUntil;
+        uint256 amountPaidTotal; // * Total amount paid by the renter
+        uint256 rentPrice; 
+        uint64 timeRentDue; 
+        uint64 timeRentedSince; 
+        uint64 timeRentedUntil; 
         PayPeriod payPeriod;
-        address renter;
-        bool renting;
-        bool hasPermission;
+        address renter; // * Address of the renter
+        bool renting; // * Is the house being rented?
+        bool hasPermission; // * Does the renter have permission to rent the house?
     }
+
+    struct proposedNewRentDetails {
+        uint256 rentPrice;
+        PayPeriod payPeriod;
+    }
+
+    proposedNewRentDetails private newRentDetails;
 
     address private allowedRenter;
 
@@ -52,7 +59,7 @@ contract House is Context, ReentrancyGuard {
         uint64 timeInstalmentDue;
         uint64 timeInstalmentSince;
         uint16 noOfInstalments;
-        uint16 penaltyPercentForOwner;
+        uint16 penaltyPercentForOwner; // * Penalty for the owner if he can the deal
         PayPeriod payPeriod;
         address buyer;
         bool termsAcceptedByOwner;
@@ -187,7 +194,7 @@ contract House is Context, ReentrancyGuard {
     }
 
     function setRentDetail(uint256 _rPrice, uint8 _period) external onlyOwner {
-        require(_period <= uint8(type(PayPeriod).max), "ERR:ST"); //ST => Small Time
+        require(_period <= uint8(type(PayPeriod).max), "ERR:WV"); //WV => Wrong Value
         require(renters[renterId].timeRentedUntil != 0, "ERR:CR"); //CR => Currently Rented
         require(_rPrice != 0, "ERR:ZR"); //ZR => Zero Rent
 
@@ -199,32 +206,116 @@ contract House is Context, ReentrancyGuard {
         //emit event
     }
 
+    function proposeNewRentDetial(uint256 _rPrice, uint8 _period)
+        external
+        onlyOwner
+    {
+        require(_period <= uint8(type(PayPeriod).max), "ERR:ST"); //ST => Small Time
+        require(renters[renterId].timeRentedUntil == 0, "ERR:CR"); // CR => Currently Rented
+        require(_rPrice != 0, "ERR:ZR"); //ZR => Zero Rent
+
+        newRentDetails = proposedNewRentDetails({
+            rentPrice: _rPrice,
+            payPeriod: PayPeriod(_period)
+        });
+
+        // emit Event
+    }
+
+    function getCurrentAmount() external view returns (uint256) {
+        RenterDetails storage details = renters[renterId];
+
+        uint64 curentPayPeriod = getSeconds(uint8(details.payPeriod));
+
+        uint256 amountToPay = ((((block.timestamp -
+            (details.timeRentDue - curentPayPeriod)) * 100) /
+            (curentPayPeriod)) * details.rentPrice) / 100;
+
+        return amountToPay;
+    }
+
+    //* Function: To accept the new rent details and update the rent details.
+    function agreeNewRentDetail(bool accepted) external payable onlyRenter {
+        proposedNewRentDetails storage rentDetails = newRentDetails;
+        require(rentDetails.rentPrice != 0, "ERR:NS"); // NS=> Not Set
+
+        if (accepted) {
+            RenterDetails storage details = renters[renterId];
+
+            uint64 curentPayPeriod = getSeconds(uint8(details.payPeriod));
+
+            uint256 amountToPay = ((((block.timestamp -
+                (details.timeRentDue - curentPayPeriod)) * 100) /
+                (curentPayPeriod)) * details.rentPrice) / 100;
+
+            uint256 value = msg.value;
+            require(value >= amountToPay, "ERR:WV"); // WV => Wrong Value
+
+            details.payPeriod = rentDetails.payPeriod;
+            details.rentPrice = rentDetails.rentPrice;
+
+            (bool success, ) = owner.call{value: value}("");
+            require(success, "ERR:OT"); //OT=> On Transaction
+
+            delete rentDetails.payPeriod;
+            delete rentDetails.rentPrice;
+        } else {
+            delete rentDetails.payPeriod;
+            delete rentDetails.rentPrice;
+
+            // TODO: If not accepted, then kick out the renter or change the .
+        }
+        //emit Event (pass the bool)
+    }
+
+    //* FUNCTION: To transfer the propety.
     function changeOwnership(address _new) external onlyDeployer {
         require(_new != address(0), "ERR:ZA"); //ZA => Zero Address
 
         ownerOfProperty = _new;
     }
 
+    //* FUNCTION: To kick out the renter with some grace period.
     function kickOutRenter(uint64 _gracePeriod) external onlyOwner {
-        renters[renterId].timeRentedUntil =
-            uint64(block.timestamp) +
-            _gracePeriod;
+        RenterDetails memory details = renters[renterId];
+
+        require(!details.renting, "ERR:NR"); //NR => Not Renting
+        require(_gracePeriod >= getSeconds(uint8(details.payPeriod)), "ERR:GP"); //GP => Grace Period
+
+        details.timeRentedUntil = uint64(block.timestamp) + _gracePeriod;
 
         // Emit Event
     }
 
+    //* FUNCTION: To kick out the renter immediately if he damages the property.
     function emergencyKick() external onlyOwner {
+        RenterDetails storage details = renters[renterId];
+
+        require(!details.renting, "ERR:NR"); //NR => Not renting
+
+        uint256 amountToRefund = details.rentPrice - getCurrentAmount();
+
+        (bool success, ) = renters[renterId].renter.call{value: amountToRefund}(
+            ""
+        );
+        require(success, "ERR:OT"); //OT=> On Transaction
+
         renters[renterId].timeRentedUntil = uint64(block.timestamp);
 
         // Emit Event
     }
 
     function allowRenter(address _renter) external onlyDeployer {
+        // Check there is currenlty no renter in this house
+        require(renters[renterId].timeRentedUntil == 0, "ERR:CR"); //CR => Currently Rented
+
         require(_renter != address(0), "ERR:ZA"); //ZA => Zero Address
         allowedRenter = _renter;
     }
 
     function getSeconds(uint8 index) internal pure returns (uint64 time) {
+        require(index <= uint8(type(PayPeriod).max), "ERR:ST"); //ST => Small Time
+
         if (index == 0) {
             time = uint64(7 days);
         } else if (index == 1) {
@@ -257,6 +348,9 @@ contract House is Context, ReentrancyGuard {
 
         require(valueSent == details.rentPrice, "ERR:WV"); //WV => Wrong Value
 
+        (bool success, ) = owner.call{value: valueSent}("");
+        require(success, "ERR:OT"); //OT => On Transfer
+
         if (id != 0) {
             require(details.timeRentedUntil != 0, "ERR:CR"); //CR => Currently Rented
         }
@@ -272,7 +366,7 @@ contract House is Context, ReentrancyGuard {
         delete allowedRenter;
     }
 
-    // Functionality for renter to leave after 1 set payperiod
+    //* Functiona: For renter to leave after 1 set payperiod
     function leaveProperty() external payable onlyRenter {
         RenterDetails storage details = renters[renterId];
 
@@ -280,8 +374,7 @@ contract House is Context, ReentrancyGuard {
         require(value == details.rentPrice, "ERR:WV"); //WV => Wrong Value
 
         (bool success, ) = ownerOfProperty.call{value: value}("");
-
-        require(success, "ERR:OT"); //OT => On Trnasfer
+        require(success, "ERR:OT"); //OT => On Transfer
 
         details.timeRentedUntil =
             uint64(block.timestamp) +
@@ -353,6 +446,7 @@ contract House is Context, ReentrancyGuard {
         deal.payPeriod = _payPeriod;
     }
 
+    // * FUUNCTION: For accepting the deal by the owner.
     function acceptDealByOwner() external onlyOwner {
         require(!currentlyInDeal, "ERR:ID"); // ID => In Deal
 
@@ -363,6 +457,7 @@ contract House is Context, ReentrancyGuard {
         deal.termsAcceptedByOwner = true;
     }
 
+    // * FUNCTION: For accepting the deal by the Buyer
     function acceptDealByBuyer() external payable onlyBuyer {
         require(!currentlyInDeal, "ERR:ID"); // ID => In Deal
 
@@ -398,7 +493,7 @@ contract House is Context, ReentrancyGuard {
         ); // NA => Not Allowed
 
         if (caller != deal.buyer) {
-            require(!currentlyInDeal, "ERR:ID");
+            require(!currentlyInDeal, "ERR:ID"); // ID => In Deal
         }
         resetDetails(deal);
     }
