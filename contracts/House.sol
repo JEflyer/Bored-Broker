@@ -78,23 +78,18 @@ contract House is Context, ReentrancyGuard {
     }
 
     constructor(
-        uint8 _numOfBedrooms,
-        uint8 _numOfBathrooms,
-        uint8 _numOfFloors,
-        uint64 _squareFootLand,
-        string memory _city,
         uint256 _buyPrice,
         uint256 _rentPrice,
         uint8 _payPeriod,
         bool _forSale,
         address _owner
     ) {
+
+        require (_rentPrice!=0, "ERR:ZV");  // ZV => Zero Value
+        require (_payPeriod <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
+        require (_owner != address(0), "ERR:IA"); // IA => Invalid Address  
+
         house = HouseDetails({
-            numOfBedrooms: _numOfBedrooms,
-            numOfBathrooms: _numOfBathrooms,
-            numOfFloors: _numOfFloors,
-            squareFootLand: _squareFootLand,
-            city: _city,
             buyPrice: _buyPrice,
             forSale: _forSale
         });
