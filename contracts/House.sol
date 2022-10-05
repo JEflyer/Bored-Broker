@@ -331,7 +331,7 @@ contract House is Context, ReentrancyGuard {
         address allowedRenterInstance = allowedRenter;
 
         require(allowedRenterInstance != address(0), "ERR:ZA"); //ZA => Zero Address
-        require(allowedRenterInstance == _msgSender(), "ERR:NR"); //NR => N
+        require(allowedRenterInstance == _msgSender(), "ERR:NR"); //NR => Not Renter
 
         uint256 id = renterId;
 
