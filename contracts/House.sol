@@ -436,6 +436,13 @@ contract House is Context, ReentrancyGuard {
         address _buyer
     ) external onlyDeployer {
         require(!currentlyInDeal, "ERR:ID"); // ID => In Deal
+        
+        require(_instalmentAmount!= 0, "ERR:ZV"); // ZV => Zero Value
+        require(_penaltyPercentageForOwner!=0, "ERR:ZV"); // ZV => Zero Value
+        require(_noOfInstalments!=0, "ERR:ZV"); // ZV => Zero Value
+        require(_buyer != address(0), "ERR:ZA"); // ZA => Zero Address
+        require(uint8(type(_payPeriod).max) <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
+
 
         DealDetails storage deal = currentDeal;
 
