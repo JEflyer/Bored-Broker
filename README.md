@@ -1,13 +1,22 @@
-# Sample Hardhat Project
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+## BRAINSTROM
+CountryA tokenA
+CountryB tokenB
 
-Try running some of the following tasks:
+When CitizenB 
 
-```shell
-npx hardhat help
-npx hardhat test
-GAS_REPORT=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
-```
+
+
+# TODO
+1. UNDERSTAND Polygon Supernet technically. 
+2. Decide the model for bridging the country specific tokens in different supernets
+3. Check how we can implement the token for each country on their supuernet.
+    a. Back by the country assets as the FIAT.
+    b. Price set according to a particular currency. 
+    1 Dollar  = Rs 80 
+    1 RsToken = 0.0125 Dollar
+    
+     
+
+    
+
