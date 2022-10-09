@@ -557,7 +557,7 @@ contract House is Context, ReentrancyGuard {
         if (--deal.noOfInstalments == 0) {
             ownerOfProperty = deal.buyer;
 
-            delete currentlyInDeal;
+            delete currentlyICAnDeal;
 
             resetDetails(deal);
 
@@ -574,6 +574,7 @@ contract House is Context, ReentrancyGuard {
         external
         onlyDeployer
     {
+        require(address != address(0), "ERR:ZA"); // ZA => Zero Address
         allowedPurchaser = _approvedBuyer;
     }
 
