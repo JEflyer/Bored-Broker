@@ -77,6 +77,8 @@ contract House is Context, ReentrancyGuard {
         year
     }
 
+    // error ZeroValue();
+
     constructor(
         uint256 _buyPrice,
         uint256 _rentPrice,
@@ -84,8 +86,9 @@ contract House is Context, ReentrancyGuard {
         bool _forSale,
         address _owner
     ) {
-
+        // if(_rentPrice == 0) revert ZeroValue();
         require (_rentPrice!=0, "ERR:ZV");  // ZV => Zero Value
+
         require (_payPeriod <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
         require (_owner != address(0), "ERR:IA"); // IA => Invalid Address  
 
