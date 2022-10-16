@@ -12,12 +12,12 @@ contract House is Context, ReentrancyGuard {
     // * Details of the House
     struct HouseDetails {
         uint256 buyPrice;
-        uint64 squareFootLand;
-        uint8 numOfBedrooms;
-        uint8 numOfBathrooms;
-        uint8 numOfFloors;
+        // uint64 squareFootLand;
+        // uint8 numOfBedrooms;
+        // uint8 numOfBathrooms;
+        // uint8 numOfFloors;
         bool forSale;
-        string city;
+        // string city;
     }
 
     HouseDetails private house;
@@ -78,23 +78,18 @@ contract House is Context, ReentrancyGuard {
     }
 
     constructor(
-        uint8 _numOfBedrooms,
-        uint8 _numOfBathrooms,
-        uint8 _numOfFloors,
-        uint64 _squareFootLand,
-        string memory _city,
         uint256 _buyPrice,
         uint256 _rentPrice,
         uint8 _payPeriod,
         bool _forSale,
         address _owner
     ) {
+
+        require (_rentPrice!=0, "ERR:ZV");  // ZV => Zero Value
+        require (_payPeriod <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
+        require (_owner != address(0), "ERR:IA"); // IA => Invalid Address  
+
         house = HouseDetails({
-            numOfBedrooms: _numOfBedrooms,
-            numOfBathrooms: _numOfBathrooms,
-            numOfFloors: _numOfFloors,
-            squareFootLand: _squareFootLand,
-            city: _city,
             buyPrice: _buyPrice,
             forSale: _forSale
         });
@@ -222,7 +217,7 @@ contract House is Context, ReentrancyGuard {
         // emit Event
     }
 
-    function getCurrentAmount() external view returns (uint256) {
+    function getCurrentAmount() public view returns (uint256) {
         RenterDetails storage details = renters[renterId];
 
         uint64 curentPayPeriod = getSeconds(uint8(details.payPeriod));
@@ -254,7 +249,7 @@ contract House is Context, ReentrancyGuard {
             details.payPeriod = rentDetails.payPeriod;
             details.rentPrice = rentDetails.rentPrice;
 
-            (bool success, ) = owner.call{value: value}("");
+            (bool success, ) = ownerOfProperty.call{value: value}("");
             require(success, "ERR:OT"); //OT=> On Transaction
 
             delete rentDetails.payPeriod;
@@ -336,7 +331,7 @@ contract House is Context, ReentrancyGuard {
         address allowedRenterInstance = allowedRenter;
 
         require(allowedRenterInstance != address(0), "ERR:ZA"); //ZA => Zero Address
-        require(allowedRenterInstance == _msgSender(), "ERR:NR"); //NR => N
+        require(allowedRenterInstance == _msgSender(), "ERR:NR"); //NR => Not Renter
 
         uint256 id = renterId;
 
@@ -348,7 +343,7 @@ contract House is Context, ReentrancyGuard {
 
         require(valueSent == details.rentPrice, "ERR:WV"); //WV => Wrong Value
 
-        (bool success, ) = owner.call{value: valueSent}("");
+        (bool success, ) = ownerOfProperty.call{value: valueSent}("");
         require(success, "ERR:OT"); //OT => On Transfer
 
         if (id != 0) {
@@ -432,10 +427,17 @@ contract House is Context, ReentrancyGuard {
         uint256 _instalmentAmount,
         uint16 _noOfInstalments,
         uint16 _penaltyPercentageForOwner,
-        PayPeriod _payPeriod,
+        uint8 _payPeriod,
         address _buyer
     ) external onlyDeployer {
         require(!currentlyInDeal, "ERR:ID"); // ID => In Deal
+        
+        require(_instalmentAmount!= 0, "ERR:ZV"); // ZV => Zero Value
+        require(_penaltyPercentageForOwner!=0, "ERR:ZV"); // ZV => Zero Value
+        require(_noOfInstalments!=0, "ERR:ZV"); // ZV => Zero Value
+        require(_buyer != address(0), "ERR:ZA"); // ZA => Zero Address
+        require(_payPeriod <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
+
 
         DealDetails storage deal = currentDeal;
 
@@ -443,7 +445,7 @@ contract House is Context, ReentrancyGuard {
         deal.buyer = _buyer;
         deal.penaltyPercentForOwner = _penaltyPercentageForOwner;
         deal.noOfInstalments = _noOfInstalments;
-        deal.payPeriod = _payPeriod;
+        deal.payPeriod = PayPeriod(_payPeriod);
     }
 
     // * FUUNCTION: For accepting the deal by the owner.
@@ -572,6 +574,7 @@ contract House is Context, ReentrancyGuard {
         external
         onlyDeployer
     {
+        require(_approvedBuyer != address(0), "ERR:ZA"); // ZA => Zero Address
         allowedPurchaser = _approvedBuyer;
     }
 
