@@ -4,6 +4,8 @@ pragma solidity 0.8.15;
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+//! TODO: setDeal should be called when the governemnt approves the owner and the parameters of the deal.
+
 contract House is Context, ReentrancyGuard {
     address private ownerOfProperty;
 
@@ -25,10 +27,10 @@ contract House is Context, ReentrancyGuard {
     // * Renting Details
     struct RenterDetails {
         uint256 amountPaidTotal; // * Total amount paid by the renter
-        uint256 rentPrice; 
-        uint64 timeRentDue; 
-        uint64 timeRentedSince; 
-        uint64 timeRentedUntil; 
+        uint256 rentPrice;
+        uint64 timeRentDue;
+        uint64 timeRentedSince;
+        uint64 timeRentedUntil;
         PayPeriod payPeriod;
         address renter; // * Address of the renter
         bool renting; // * Is the house being rented?
@@ -87,15 +89,12 @@ contract House is Context, ReentrancyGuard {
         address _owner
     ) {
         // if(_rentPrice == 0) revert ZeroValue();
-        require (_rentPrice!=0, "ERR:ZV");  // ZV => Zero Value
+        require(_rentPrice != 0, "ERR:ZV"); // ZV => Zero Value
 
-        require (_payPeriod <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
-        require (_owner != address(0), "ERR:IA"); // IA => Invalid Address  
+        require(_payPeriod <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
+        require(_owner != address(0), "ERR:IA"); // IA => Invalid Address
 
-        house = HouseDetails({
-            buyPrice: _buyPrice,
-            forSale: _forSale
-        });
+        house = HouseDetails({buyPrice: _buyPrice, forSale: _forSale});
         deployer = _msgSender();
 
         RenterDetails storage renter = renters[1];
@@ -163,6 +162,7 @@ contract House is Context, ReentrancyGuard {
     }
 
     function setPayPeriod(uint8 _new) external onlyOwner {
+        //! Need to check the require statement
         require(_new > uint64(7 days) - 1, "ERR:ST"); //ST => Small Time
 
         require(renters[renterId].timeRentedUntil != 0, "ERR:CR"); //CR => Currently Rented
@@ -434,13 +434,12 @@ contract House is Context, ReentrancyGuard {
         address _buyer
     ) external onlyDeployer {
         require(!currentlyInDeal, "ERR:ID"); // ID => In Deal
-        
-        require(_instalmentAmount!= 0, "ERR:ZV"); // ZV => Zero Value
-        require(_penaltyPercentageForOwner!=0, "ERR:ZV"); // ZV => Zero Value
-        require(_noOfInstalments!=0, "ERR:ZV"); // ZV => Zero Value
+
+        require(_instalmentAmount != 0, "ERR:ZV"); // ZV => Zero Value
+        require(_penaltyPercentageForOwner != 0, "ERR:ZV"); // ZV => Zero Value
+        require(_noOfInstalments != 0, "ERR:ZV"); // ZV => Zero Value
         require(_buyer != address(0), "ERR:ZA"); // ZA => Zero Address
         require(_payPeriod <= uint8(type(PayPeriod).max), "ERR:IV"); // IV => Invalid Value
-
 
         DealDetails storage deal = currentDeal;
 
