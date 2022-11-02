@@ -95,7 +95,7 @@ contract House is Context, ReentrancyGuard {
         require(_owner != address(0), "ERR:IA"); // IA => Invalid Address
 
         house = HouseDetails({buyPrice: _buyPrice, forSale: _forSale});
-        deployer = _msgSender();
+        deployer = msg.sender;
 
         RenterDetails storage renter = renters[1];
 
@@ -111,7 +111,7 @@ contract House is Context, ReentrancyGuard {
     }
 
     modifier onlyDeployer() {
-        require(_msgSender() == deployer, "ERR:ND"); // ND => Not Deployer
+        require(msg.sender == deployer, "ERR:ND"); // ND => Not Deployer
         _;
     }
 
@@ -163,7 +163,9 @@ contract House is Context, ReentrancyGuard {
 
     function setPayPeriod(uint8 _new) external onlyOwner {
         //! Need to check the require statement
-        require(_new > uint64(7 days) - 1, "ERR:ST"); //ST => Small Time
+        // require(_new > uint64(7 days) - 1, "ERR:ST"); //ST => Small Time
+
+        require(_new <= uint8(type(PayPeriod).max),"ERR:PP");
 
         require(renters[renterId].timeRentedUntil != 0, "ERR:CR"); //CR => Currently Rented
 
