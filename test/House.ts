@@ -116,20 +116,15 @@ describe("House", function () {
       let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
         await loadFixture(setup);
 
-      await House.connect(deployer).setDeal(
-        1000,
-        5,
-        2,
-        3,
-        buyer.address
-      )
+      await House.connect(deployer).setDeal(1000, 5, 2, 3, buyer.address);
 
-      await House.connect(owner).acceptDealByOwner()
+      await House.connect(owner).acceptDealByOwner();
 
-      await House.connect(buyer).acceptDealByBuyer()
-      
+      await House.connect(buyer).acceptDealByBuyer();
 
-      expect(House.connect(deployer).setBuyPrice(2)).to.be.revertedWith("ERR:ID");
+      expect(House.connect(deployer).setBuyPrice(2)).to.be.revertedWith(
+        "ERR:ID"
+      );
     });
 
     it("Should be reverted if caller is not owner", async () => {
@@ -140,8 +135,6 @@ describe("House", function () {
         "ERR:NO"
       );
     });
-
-    it("Should not", async () => {});
   });
 
   describe("SetRentPrice", () => {
@@ -165,14 +158,14 @@ describe("House", function () {
       let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
         await loadFixture(setup);
 
-        await House.connect(deployer).allowRenter(renter.address)
+      await House.connect(deployer).allowRenter(renter.address);
 
-        await House.connect(renter).startNewRent({value: rentPrice})
+      await House.connect(renter).startNewRent({ value: rentPrice });
 
-        expect(House.connect(owner).setRentPrice(100000)).to.be.revertedWith("ERR:CR")
+      expect(House.connect(owner).setRentPrice(100000)).to.be.revertedWith(
+        "ERR:CR"
+      );
     });
-
-    it("Should ", async () => {});
   });
 
   describe("SetPayPeriod", () => {
@@ -189,12 +182,24 @@ describe("House", function () {
       let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
         await loadFixture(setup);
       //! Need to check the require statement
-      expect(House.connect(owner).setPayPeriod(2000)).to.be.revertedWith("ERR:PP");
+      //* DONE
+      expect(House.connect(owner).setPayPeriod(2000)).to.be.revertedWith(
+        "ERR:PP"
+      );
     });
 
-    it("Should not allow to set new pay period if the house is currently rented", async () => {});
+    it("Should not allow to set new pay period if the house is currently rented", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
 
-    it("Should not", async () => {});
+      await House.connect(deployer).allowRenter(renter.address);
+
+      await House.connect(renter).startNewRent({ value: rentPrice });
+
+      expect(House.connect(owner).setPayPeriod(100000)).to.be.revertedWith(
+        "ERR:CR"
+      );
+    });
   });
 
   describe("SetForSale", () => {
@@ -207,9 +212,20 @@ describe("House", function () {
       );
     });
 
-    it("Should not allow to set for sale if currently in deal", async () => {});
+    it("Should not allow to set for sale if currently in deal", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
 
-    it("Should ", async () => {});
+      await House.connect(deployer).setDeal(1000, 5, 2, 3, buyer.address);
+
+      await House.connect(owner).acceptDealByOwner();
+
+      await House.connect(buyer).acceptDealByBuyer();
+
+      expect(House.connect(owner).setForSale(true)).to.be.revertedWith(
+        "ERR:ID"
+      );
+    });
   });
 
   describe("SetHouseDetails", () => {
@@ -230,37 +246,196 @@ describe("House", function () {
         "ERR:ZP"
       );
     });
-    it("Should ", async () => {});
+
+    it("Should not allow to change House Details if currently in deal", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(deployer).setDeal(1000, 5, 2, 3, buyer.address);
+
+      await House.connect(owner).acceptDealByOwner();
+
+      await House.connect(buyer).acceptDealByBuyer();
+
+      expect(
+        House.connect(owner).setHouseDetails(1000, true)
+      ).to.be.revertedWith("ERR:ID");
+    });
   });
 
   describe("SetRentDetails", () => {
-    it("Should not", async () => {});
-    it("Should not", async () => {});
-    it("Should not", async () => {});
-    it("Should ", async () => {});
-    it("Should ", async () => {});
+    it("Should not allow if the caller is not the owner", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(House.connect(renter).setRentDetail(1000, 1)).to.be.revertedWith(
+        "ERR:NO"
+      );
+    });
+    it("Should not allow if the period in the argument is wrong value", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(House.connect(owner).setRentDetail(1000, 1000)).to.be.revertedWith(
+        "ERR:WV"
+      );
+    });
+    it("Should not allow to set rent if the house is currently rented", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(deployer).allowRenter(renter.address);
+
+      await House.connect(renter).startNewRent({ value: rentPrice });
+
+      expect(House.connect(owner).setRentDetail(1000, 1)).to.be.revertedWith(
+        "ERR:CR"
+      );
+    });
+    it("Should not allow to set rent if the rent is 0 ", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(House.connect(owner).setRentDetail(0, 1)).to.be.revertedWith(
+        "ERR:ZP"
+      );
+    });
   });
+
   describe("ProposeNewRentDetails", () => {
-    it("Should not", async () => {});
-    it("Should not", async () => {});
-    it("Should not", async () => {});
-    it("Should not", async () => {});
-    it("Should ", async () => {});
+    it("Should not allow if the caller is not the owner.", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(
+        House.connect(renter).proposeNewRentDetails(1000, 1)
+      ).to.be.revertedWith("ERR:NO");
+    });
+    it("Should not allow if the period in the argument is wrong value", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(
+        House.connect(owner).proposeNewRentDetail(1000, 1000)
+      ).to.be.revertedWith("ERR:WV");
+    });
+    it("Should not allow if the house is currently rented", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(deployer).allowRenter(renter.address);
+
+      await House.connect(renter).startNewRent({ value: rentPrice });
+
+      expect(
+        House.connect(owner).proposeNewRentDetail(1000, 1)
+      ).to.be.revertedWith("ERR:CR");
+    });
+    it("Should not allow if the rent is set to 0", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(
+        House.connect(owner).proposeNewRentDetail(0, 1)
+      ).to.be.revertedWith("ERR:ZP");
+    });
   });
+
+  //! TODO
   describe("GetCurrentAmount", () => {
     it("Should ", async () => {});
   });
+
   describe("AgreeNewRentDetails", () => {
-    it("Should not", async () => {});
-    it("Should ", async () => {});
-    it("Should ", async () => {});
+    it("Should not allow if the caller is not the renter", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(owner).proposeNewRentDetail(1000, 1);
+
+      expect(House.connect(owner).agreeNewRentDetail(true)).to.be.revertedWith(
+        "ERR:NR"
+      );
+    });
+    it("Should not allow if the rent price is 0", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(owner).proposeNewRentDetail(0, 1);
+
+      expect(House.connect(renter).agreeNewRentDetail(true)).to.be.revertedWith(
+        "ERR:ZP"
+      );
+    });
+    it("Should fail the transaction if the value passed is less then amount to be paid", async () => {});
   });
+
   describe("ChangeOwnership", () => {
-    it("Should not", async () => {});
-    it("Should ", async () => {});
-    it("Should not", async () => {});
+    it("Should not allow if the caller is not deployer", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(
+        House.connect(owner).changeOwnership(buyer.address)
+      ).to.be.revertedWith("ERR:ND");
+    });
+    it("Should not allow if the address given is 0 ", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(
+        House.connect(deployer).changeOwnership(ethers.constants.AddressZero)
+      ).to.be.revertedWith("ERR:ZA");
+    });
+    it("Should change if the address passed is not zero and the caller is the deployer", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(deployer).changeOwnership(buyer.address);
+
+      expect(await House.owner()).to.equal(buyer.address);
+    });
   });
-  describe("AllowRenter", () => {});
+
+  describe("AllowRenter", () => {
+    it("Should not allow if the caller is not the deployer", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(
+        House.connect(renter).allowRenter(buyer.address)
+      ).to.be.revertedWith("ERR:ND");
+    });
+    it("Should not allow if the address passed is 0", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      expect(
+        House.connect(deployer).allowRenter(ethers.constants.AddressZero)
+      ).to.be.revertedWith("ERR:ZA");
+    });
+    it("Should not allow if the renter is currently rented the house", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(deployer).allowRenter(renter.address);
+
+      await House.connect(renter).startNewRent({ value: rentPrice });
+
+      expect(
+        House.connect(deployer).allowRenter(buyer.address)
+      ).to.be.revertedWith("ERR:CR");
+    });
+    it("Should allow if the address passed is not 0 and the caller is the deployer", async () => {
+      let { House, buyPrice, rentPrice, owner, deployer, renter, buyer } =
+        await loadFixture(setup);
+
+      await House.connect(deployer).allowRenter(buyer.address);
+
+      expect(await House.renter()).to.equal(buyer.address);
+    });
+  });
+
   describe("EmergencyKick", () => {});
   describe("KickOutRenter", () => {});
   describe("GetSeconds", () => {});
