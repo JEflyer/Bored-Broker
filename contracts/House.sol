@@ -97,6 +97,9 @@ contract House is Context, ReentrancyGuard {
         house = HouseDetails({buyPrice: _buyPrice, forSale: _forSale});
         deployer = msg.sender;
 
+        // @dev => This will set the address of the caller as deployer instead of factory contract
+        // deployer = _msgSender();
+
         RenterDetails storage renter = renters[1];
 
         renter.rentPrice = _rentPrice;
@@ -161,11 +164,9 @@ contract House is Context, ReentrancyGuard {
         //emit event
     }
 
+    //! TODO: Modifier for checking the payPeriod value.
     function setPayPeriod(uint8 _new) external onlyOwner {
-        //! Need to check the require statement
-        // require(_new > uint64(7 days) - 1, "ERR:ST"); //ST => Small Time
-
-        require(_new <= uint8(type(PayPeriod).max),"ERR:PP");
+        require(_new <= uint8(type(PayPeriod).max), "ERR:PP");
 
         require(renters[renterId].timeRentedUntil != 0, "ERR:CR"); //CR => Currently Rented
 
@@ -206,10 +207,10 @@ contract House is Context, ReentrancyGuard {
         //emit event
     }
 
-    function proposeNewRentDetial(uint256 _rPrice, uint8 _period)
-        external
-        onlyOwner
-    {
+    function proposeNewRentDetial(
+        uint256 _rPrice,
+        uint8 _period
+    ) external onlyOwner {
         require(_period <= uint8(type(PayPeriod).max), "ERR:ST"); //ST => Small Time
         require(renters[renterId].timeRentedUntil == 0, "ERR:CR"); // CR => Currently Rented
         require(_rPrice != 0, "ERR:ZR"); //ZR => Zero Rent
@@ -574,10 +575,9 @@ contract House is Context, ReentrancyGuard {
     }
 
     // * FUNCTION: Giving permission to the address to buy the property at Once
-    function givePermissionToBuyOutRight(address _approvedBuyer)
-        external
-        onlyDeployer
-    {
+    function givePermissionToBuyOutRight(
+        address _approvedBuyer
+    ) external onlyDeployer {
         require(_approvedBuyer != address(0), "ERR:ZA"); // ZA => Zero Address
         allowedPurchaser = _approvedBuyer;
     }
